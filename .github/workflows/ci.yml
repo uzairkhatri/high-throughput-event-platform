@@ -38,15 +38,26 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: "1"
         run: pytest -q -m integration
-      - name: Run reproducible k6 smoke profile
+      - name: Capture benchmark environment
         run: |
           mkdir -p benchmark-results
-          docker compose --profile benchmark run --rm k6
+          {
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_arch=${RUNNER_ARCH}"
+            uname -a
+            lscpu
+            free -h
+            docker version
+            docker compose version
+            docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}'
+          } | tee benchmark-results/environment.txt
+      - name: Run reproducible k6 smoke profile
+        run: docker compose --profile benchmark run --rm k6
       - name: Upload raw benchmark summary
         uses: actions/upload-artifact@v4
         with:
           name: k6-summary
-          path: benchmark-results/summary.json
+          path: benchmark-results/
           if-no-files-found: error
       - name: Show service logs on failure
         if: failure()
