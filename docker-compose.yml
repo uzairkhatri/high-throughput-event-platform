@@ -60,7 +60,7 @@ services:
     ports:
       - "19092:19092"
     healthcheck:
-      test: ["CMD", "rpk", "cluster", "health", "--brokers=localhost:9092", "--exit-when-healthy"]
+      test: ["CMD", "rpk", "cluster", "health", "-X", "brokers=localhost:9092", "--exit-when-healthy"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -70,10 +70,10 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        (rpk topic create events.orders.v1 --partitions 12 --replicas 1 --brokers redpanda:9092 ||
-        rpk topic describe events.orders.v1 --brokers redpanda:9092) &&
-        (rpk topic create events.orders.dlq.v1 --partitions 12 --replicas 1 --brokers redpanda:9092 ||
-        rpk topic describe events.orders.dlq.v1 --brokers redpanda:9092)
+        (rpk topic create events.orders.v1 --partitions 12 --replicas 1 -X brokers=redpanda:9092 ||
+        rpk topic describe events.orders.v1 -X brokers=redpanda:9092) &&
+        (rpk topic create events.orders.dlq.v1 --partitions 12 --replicas 1 -X brokers=redpanda:9092 ||
+        rpk topic describe events.orders.dlq.v1 -X brokers=redpanda:9092)
     depends_on:
       redpanda:
         condition: service_healthy
