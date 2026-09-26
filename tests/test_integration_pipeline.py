@@ -65,7 +65,7 @@ async def test_end_to_end_ordering_idempotency_and_dlq() -> None:
     connection = await asyncpg.connect(POSTGRES_DSN)
 
     try:
-        partitions = await consumer.partitions_for_topic("events.orders.dlq.v1")
+        partitions = consumer.partitions_for_topic("events.orders.dlq.v1")
         assert partitions is not None
         assert len(partitions) == 12
 
