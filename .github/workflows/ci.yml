@@ -38,6 +38,16 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: "1"
         run: pytest -q -m integration
+      - name: Run reproducible k6 smoke profile
+        run: |
+          mkdir -p benchmark-results
+          docker compose --profile benchmark run --rm k6
+      - name: Upload raw benchmark summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-summary
+          path: benchmark-results/summary.json
+          if-no-files-found: error
       - name: Show service logs on failure
         if: failure()
         run: docker compose logs --no-color
