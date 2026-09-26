@@ -7,7 +7,7 @@
 | Client retries the same request | Idempotency key returns the original accepted event |
 | Worker receives the same event twice | Consumer-side processed-event table prevents duplicate projection writes |
 | Transient dependency failure | Bounded exponential backoff with jitter |
-| Poison message | Dead-letter topic/table with error metadata |
+| Poison message | Dead-letter topic with the original envelope, failure type, message, and attempt count |
 | Stream lag increases | Scale workers by consumer group lag and partition count |
 | Hot aggregate | Investigate business-level sharding or command-side throttling |
 
@@ -26,7 +26,6 @@ own infrastructure:
 
 ## Benchmarking
 
-Use `load-tests/k6-ingestion.js` as a smoke profile. Store measured reports in
-`reports/` and publish the hardware, image tags, partition count, worker count,
-payload shape, and database configuration with any numbers.
+Use `docker compose --profile benchmark run --rm k6` to execute the pinned smoke
+profile. Follow [the benchmark protocol](benchmarks.md) before publishing results.
 

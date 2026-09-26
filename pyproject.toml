@@ -1,6 +1,6 @@
 [project]
 name = "high-throughput-event-platform"
-version = "0.1.0"
+version = "0.2.0"
 description = "Reference architecture for high-throughput event ingestion, streaming, workers, and operational controls."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -27,10 +27,18 @@ dev = [
 kafka = ["aiokafka>=0.11.0"]
 postgres = ["asyncpg>=0.29.0"]
 redis = ["redis>=5.0.0"]
+distributed = [
+  "aiokafka>=0.11.0",
+  "asyncpg>=0.29.0",
+  "redis>=5.0.0",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+  "integration: requires the Docker Compose stack",
+]
 
 [tool.setuptools.packages.find]
 include = ["app*"]

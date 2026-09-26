@@ -17,8 +17,9 @@ export const options = {
 
 export default function () {
   const id = `${__VU}-${__ITER}`;
+  const baseUrl = __ENV.BASE_URL || "http://localhost:8000";
   const response = http.post(
-    "http://localhost:8000/v1/events",
+    `${baseUrl}/v1/events`,
     JSON.stringify({
       tenant_id: "tenant-a",
       event_type: "order.created",

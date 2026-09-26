@@ -17,15 +17,24 @@ spec:
       containers:
         - name: worker
           image: ghcr.io/uzairkhatri/high-throughput-event-platform/worker:latest
-          command: ["python", "-m", "app.workers.order_projection"]
+          command: ["python", "-m", "app.workers.runtime"]
           env:
             - name: EVENT_PLATFORM_ENVIRONMENT
               value: production
+            - name: EVENT_PLATFORM_RUNTIME_MODE
+              value: distributed
             - name: EVENT_PLATFORM_KAFKA_BOOTSTRAP_SERVERS
               valueFrom:
                 secretKeyRef:
                   name: event-platform-secrets
                   key: kafka-bootstrap-servers
+            - name: EVENT_PLATFORM_POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: event-platform-secrets
+                  key: postgres-dsn
+            - name: EVENT_PLATFORM_OTLP_ENDPOINT
+              value: http://otel-collector:4318
           resources:
             requests:
               cpu: 250m

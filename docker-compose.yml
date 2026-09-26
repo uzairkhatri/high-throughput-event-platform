@@ -1,17 +1,42 @@
 services:
   api:
     build: .
-    environment:
+    environment: &runtime-environment
       EVENT_PLATFORM_ENVIRONMENT: local
+      EVENT_PLATFORM_RUNTIME_MODE: distributed
       EVENT_PLATFORM_KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      EVENT_PLATFORM_REDIS_URL: redis://redis:6379/0
+      EVENT_PLATFORM_POSTGRES_DSN: postgresql://events:events@postgres:5432/events
       EVENT_PLATFORM_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
       - "8000:8000"
     depends_on:
-      - redpanda
-      - postgres
-      - redis
-      - otel-collector
+      redpanda-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    build: .
+    command: ["python", "-m", "app.workers.runtime"]
+    environment: *runtime-environment
+    depends_on:
+      redpanda-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    restart: unless-stopped
 
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v24.2.4
@@ -29,11 +54,29 @@ services:
       - "0"
       - --check=false
       - --kafka-addr
-      - PLAINTEXT://0.0.0.0:9092
+      - INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092
       - --advertise-kafka-addr
-      - PLAINTEXT://redpanda:9092
+      - INTERNAL://redpanda:9092,EXTERNAL://localhost:19092
     ports:
-      - "9092:9092"
+      - "19092:19092"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health --brokers=localhost:9092 | grep -E 'Healthy:.+true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redpanda-init:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.4
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        (rpk topic create events.orders.v1 --partitions 12 --replicas 1 --brokers redpanda:9092 ||
+        rpk topic describe events.orders.v1 --brokers redpanda:9092) &&
+        (rpk topic create events.orders.dlq.v1 --partitions 12 --replicas 1 --brokers redpanda:9092 ||
+        rpk topic describe events.orders.dlq.v1 --brokers redpanda:9092)
+    depends_on:
+      redpanda:
+        condition: service_healthy
 
   postgres:
     image: postgres:16-alpine
@@ -45,11 +88,21 @@ services:
       - "5432:5432"
     volumes:
       - ./app/db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U events -d events"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.109.0
@@ -59,4 +112,17 @@ services:
     ports:
       - "4317:4317"
       - "4318:4318"
+
+  k6:
+    image: grafana/k6:0.54.0
+    profiles: ["benchmark"]
+    environment:
+      BASE_URL: http://api:8000
+    volumes:
+      - ./load-tests:/scripts:ro
+      - ./benchmark-results:/results
+    command: ["run", "--summary-export=/results/summary.json", "/scripts/k6-ingestion.js"]
+    depends_on:
+      api:
+        condition: service_healthy
 
