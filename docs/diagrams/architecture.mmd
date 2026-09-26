@@ -1,0 +1,13 @@
+flowchart LR
+    Client[API clients] --> Gateway[FastAPI ingestion gateway]
+    Gateway --> Idem[Redis idempotency keys]
+    Gateway --> Events[(Kafka-compatible stream)]
+    Events --> WorkerA[Order projection worker]
+    Events --> WorkerB[Notification worker]
+    WorkerA --> Postgres[(PostgreSQL projections)]
+    WorkerA --> DLQ[(Dead-letter topic)]
+    WorkerB --> DLQ
+    Gateway --> OTel[OpenTelemetry collector]
+    WorkerA --> OTel
+    WorkerB --> OTel
+

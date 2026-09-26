@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-projection-worker
+  labels:
+    app: order-projection-worker
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: order-projection-worker
+  template:
+    metadata:
+      labels:
+        app: order-projection-worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/uzairkhatri/high-throughput-event-platform/worker:latest
+          command: ["python", "-m", "app.workers.order_projection"]
+          env:
+            - name: EVENT_PLATFORM_ENVIRONMENT
+              value: production
+            - name: EVENT_PLATFORM_KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                secretKeyRef:
+                  name: event-platform-secrets
+                  key: kafka-bootstrap-servers
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+

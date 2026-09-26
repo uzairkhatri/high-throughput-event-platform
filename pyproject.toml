@@ -1,0 +1,45 @@
+[project]
+name = "high-throughput-event-platform"
+version = "0.1.0"
+description = "Reference architecture for high-throughput event ingestion, streaming, workers, and operational controls."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Uzair Khatri" }]
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "pydantic>=2.8.0",
+  "pydantic-settings>=2.4.0",
+  "opentelemetry-api>=1.26.0",
+  "opentelemetry-sdk>=1.26.0",
+  "opentelemetry-instrumentation-fastapi>=0.47b0",
+  "opentelemetry-exporter-otlp>=1.26.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.27.0",
+  "pytest>=8.3.0",
+  "pytest-asyncio>=0.24.0",
+  "ruff>=0.6.0",
+]
+kafka = ["aiokafka>=0.11.0"]
+postgres = ["asyncpg>=0.29.0"]
+redis = ["redis>=5.0.0"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["deploy*", "docs*", "load-tests*", "tests*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
