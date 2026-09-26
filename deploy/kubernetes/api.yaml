@@ -22,11 +22,20 @@ spec:
           env:
             - name: EVENT_PLATFORM_ENVIRONMENT
               value: production
+            - name: EVENT_PLATFORM_RUNTIME_MODE
+              value: distributed
             - name: EVENT_PLATFORM_KAFKA_BOOTSTRAP_SERVERS
               valueFrom:
                 secretKeyRef:
                   name: event-platform-secrets
                   key: kafka-bootstrap-servers
+            - name: EVENT_PLATFORM_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: event-platform-secrets
+                  key: redis-url
+            - name: EVENT_PLATFORM_OTLP_ENDPOINT
+              value: http://otel-collector:4318
           readinessProbe:
             httpGet:
               path: /healthz

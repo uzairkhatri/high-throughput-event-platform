@@ -1,5 +1,6 @@
 __pycache__/
 .pytest_cache/
+benchmark-results/
 .ruff_cache/
 .venv/
 .env

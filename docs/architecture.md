@@ -36,18 +36,20 @@ do not require strict per-aggregate order.
 
 ## Delivery Semantics
 
-The intended production model is at-least-once delivery with explicit idempotency:
+The implemented Docker runtime uses at-least-once delivery with explicit idempotency:
 
 - producer-side idempotency rejects duplicate client requests with the original `event_id`;
 - stream delivery may replay events;
-- workers record processed `event_id` values before or in the same transaction as projection updates;
+- workers insert processed `event_id` values in the same PostgreSQL transaction as projection updates;
 - non-recoverable messages are moved to a DLQ with error metadata.
+
+Kafka offsets are committed only after the projection succeeds, a duplicate is recognized, or the DLQ publish is acknowledged. Unexpected infrastructure failures leave the offset uncommitted for redelivery.
 
 ## What Is Deliberately Omitted
 
 This is a reference architecture, not a managed production platform. It does not
 include multi-region replication, schema registry enforcement, Kafka ACL setup,
-backfill tooling, autoscaling policies, or dashboards. The repository shows where
+DLQ replay, backfill tooling, autoscaling policies, or dashboards. The repository shows where
 those controls belong and includes enough code and configuration to inspect the
 system design.
 

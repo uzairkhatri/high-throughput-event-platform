@@ -2,7 +2,7 @@
 
 **Reference architecture for event ingestion, Kafka-style streaming, idempotent workers, retries, DLQ handling, and observable operations.**
 
-This repository demonstrates distributed-systems design choices that often sit underneath production AI, fintech, marketplace, and workflow products: durable ingestion, partitioned streams, at-least-once processing, backpressure-aware workers, and operational evidence.
+This repository demonstrates distributed-systems design choices that often sit underneath production AI, fintech, marketplace, and workflow products: durable ingestion, partitioned streams, at-least-once processing, backpressure-aware workers, and operational evidence. Its Docker path runs the complete flow with Redpanda, Redis, PostgreSQL, and OpenTelemetry.
 
 It is a **reference architecture, not a benchmark claim**. The code and configuration are intentionally inspectable; any throughput numbers should be generated in your own environment with the included load-test harness and published with hardware, partition, payload, and worker details.
 
@@ -10,11 +10,12 @@ It is a **reference architecture, not a benchmark claim**. The code and configur
 
 | Engineering question | Where it is shown |
 | --- | --- |
-| How are duplicate client retries handled? | API idempotency boundary in `app/common/idempotency.py` and ingestion tests |
+| How are duplicate client retries handled? | Atomic Redis `SET NX` reservations with owner-safe rollback |
 | How is stream ordering controlled? | `tenant_id:aggregate_id` partition keys in `app/common/partitioning.py` |
-| What happens when a worker sees a bad event? | DLQ records in `app/workers/order_projection.py` |
+| What happens when a worker sees a bad event? | Bounded retries and Kafka DLQ records in `app/workers/processor.py` |
 | How are retries bounded? | Exponential backoff policy with jitter in `app/common/retry.py` |
-| Where do PostgreSQL, Redis, and Kafka fit? | `docker-compose.yml`, `app/db/schema.sql`, and architecture docs |
+| How are replayed events handled? | Transactional `processed_events` insert and projection update in PostgreSQL |
+| Where do PostgreSQL, Redis, and Kafka fit? | Running adapters, `docker-compose.yml`, schema, and architecture docs |
 | How would this run on Kubernetes? | API and worker manifests in `deploy/kubernetes/` |
 | How is observability wired? | FastAPI instrumentation and OpenTelemetry collector config |
 | How can load be tested honestly? | k6 smoke profile in `load-tests/k6-ingestion.js` |
@@ -54,7 +55,31 @@ load-tests/             k6 ingestion smoke profile
 tests/                  unit tests for ingestion, partitioning, idempotency, worker behavior
 ```
 
-## Run the Local API
+## Run the Complete Stack
+
+```bash
+docker compose up -d --build api worker
+```
+
+This creates two 12-partition topics, starts the API and projection worker, shares idempotency reservations through Redis, persists projections in PostgreSQL, and exports API and worker traces through the OpenTelemetry collector.
+
+Run the end-to-end proof:
+
+```bash
+python -m pip install -e ".[dev,distributed]"
+RUN_INTEGRATION_TESTS=1 pytest -q -m integration
+```
+
+PowerShell:
+
+```powershell
+$env:RUN_INTEGRATION_TESTS = "1"
+python -m pytest -q -m integration
+```
+
+The integration test verifies topic partition counts, duplicate request suppression, ordered create/cancel projection, and poison-event delivery to the DLQ.
+
+## Run the Lightweight API
 
 ```bash
 python -m venv .venv
@@ -86,7 +111,7 @@ curl -X POST http://127.0.0.1:8000/v1/events \
   }'
 ```
 
-The default process uses an in-memory publisher so the API can be inspected without running Kafka. `docker-compose.yml` shows the intended supporting topology with Redpanda, PostgreSQL, Redis, and an OpenTelemetry collector.
+The default process uses in-memory adapters so the API can be inspected without infrastructure. Docker Compose explicitly selects the distributed runtime.
 
 ## Verify It
 
@@ -96,15 +121,25 @@ ruff check .
 pytest -q
 ```
 
-The tests prove the local reference behavior: event validation, stable partition keys, idempotent ingestion, duplicate suppression, worker-side duplicate handling, and DLQ routing for non-recoverable messages.
+The unit tests prove validation, stable partition keys, reservation rollback, Redis duplicate suppression, bounded retries, worker-side duplicate handling, and DLQ routing. CI also runs the complete containerized integration test.
 
 ## Load Testing Without Inflated Claims
 
-Start the API, then run:
+With the Docker stack running, execute k6 through its pinned container image:
 
 ```bash
-k6 run load-tests/k6-ingestion.js
+docker compose --profile benchmark run --rm k6
 ```
+
+The raw summary is written to `benchmark-results/summary.json`, which is intentionally ignored by Git until it has been reviewed and documented with its environment metadata.
+
+### Latest measured smoke run
+
+| Environment | Requests | Request rate | Failures | Median | p95 | Maximum |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| GitHub-hosted Linux runner, 4 vCPU, 15 GiB RAM | 2,654 | 88.16/s | 0 | 12.27 ms | 15.51 ms | 59.84 ms |
+
+This is an API-acceptance smoke result, not a production capacity claim. See the [dated report](docs/benchmarks/2026-09-26-github-actions.md) for the environment, topology, raw artifact, and limitations.
 
 Do not copy numbers from another machine into this README. If you publish results, include:
 
@@ -117,20 +152,22 @@ Do not copy numbers from another machine into this README. If you publish result
 
 ## Design Notes
 
-- **Delivery model:** at-least-once delivery with explicit idempotency at producers and consumers.
+- **Delivery model:** at-least-once delivery with Redis idempotency at ingestion and transactional PostgreSQL idempotency at consumers.
 - **Partitioning:** `tenant_id:aggregate_id` preserves per-aggregate order while spreading tenants across partitions.
 - **Retries:** recoverable failures should use bounded exponential backoff with jitter; poison messages belong in the DLQ.
 - **Schema evolution:** event schema versions are part of the envelope; production deployments should add a schema registry and compatibility checks.
-- **Observability:** trace IDs flow through the event envelope and OpenTelemetry is wired at the API edge.
+- **Observability:** trace IDs flow through the event envelope and OpenTelemetry spans are emitted by the API and worker.
 
 ## Production Gaps
 
-Before adopting this pattern for real traffic, add authentication, tenant authorization, Redis-backed idempotency, Kafka producer configuration, consumer loops, database transactions around processed-event writes, schema registry checks, dashboards, alerts, signed images, TLS/mTLS, secret rotation, and tested DLQ replay tooling.
+Before adopting this pattern for real traffic, add authentication, tenant authorization, schema registry checks, dashboards, alerts, autoscaling from consumer lag, signed images, TLS/mTLS, secret rotation, and operator-approved DLQ replay tooling.
 
 ## Explore the Decisions
 
 - [Architecture](docs/architecture.md)
 - [Reliability and operations](docs/reliability.md)
+- [Benchmark protocol](docs/benchmarks.md)
+- [Measured CI smoke run: 2026-09-26](docs/benchmarks/2026-09-26-github-actions.md)
 - [Security considerations](docs/security.md)
 - [ADR 0001: Kafka-compatible stream](docs/adrs/0001-use-kafka-compatible-stream.md)
 - [ADR 0002: at-least-once delivery with idempotent effects](docs/adrs/0002-idempotency-and-at-least-once-delivery.md)
