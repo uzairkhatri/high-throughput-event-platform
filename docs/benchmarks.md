@@ -16,3 +16,7 @@ The included k6 profile is a repeatable way to characterize one declared environ
 
 Only commit a dated report when the raw summary and environment metadata are available.
 Do not generalize a development-machine result into a production throughput guarantee.
+
+## Published Runs
+
+- [2026-09-26 GitHub Actions smoke run](benchmarks/2026-09-26-github-actions.md)

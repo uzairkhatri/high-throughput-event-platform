@@ -133,6 +133,14 @@ docker compose --profile benchmark run --rm k6
 
 The raw summary is written to `benchmark-results/summary.json`, which is intentionally ignored by Git until it has been reviewed and documented with its environment metadata.
 
+### Latest measured smoke run
+
+| Environment | Requests | Request rate | Failures | Median | p95 | Maximum |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| GitHub-hosted Linux runner, 4 vCPU, 15 GiB RAM | 2,654 | 88.16/s | 0 | 12.27 ms | 15.51 ms | 59.84 ms |
+
+This is an API-acceptance smoke result, not a production capacity claim. See the [dated report](docs/benchmarks/2026-09-26-github-actions.md) for the environment, topology, raw artifact, and limitations.
+
 Do not copy numbers from another machine into this README. If you publish results, include:
 
 - CPU, memory, disk, and network context;
@@ -159,6 +167,7 @@ Before adopting this pattern for real traffic, add authentication, tenant author
 - [Architecture](docs/architecture.md)
 - [Reliability and operations](docs/reliability.md)
 - [Benchmark protocol](docs/benchmarks.md)
+- [Measured CI smoke run: 2026-09-26](docs/benchmarks/2026-09-26-github-actions.md)
 - [Security considerations](docs/security.md)
 - [ADR 0001: Kafka-compatible stream](docs/adrs/0001-use-kafka-compatible-stream.md)
 - [ADR 0002: at-least-once delivery with idempotent effects](docs/adrs/0002-idempotency-and-at-least-once-delivery.md)
